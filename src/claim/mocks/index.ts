@@ -19,7 +19,6 @@ export const existingPolicies: Policy[] = [
     coverageLimit: 50000,
     coveredIncidents: [
       IncidentType.ACCIDENT,
-      IncidentType.THEFT,
       IncidentType.FIRE,
       IncidentType.WATER_DAMAGE,
     ],
