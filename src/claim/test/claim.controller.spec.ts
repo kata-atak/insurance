@@ -17,7 +17,7 @@ describe('ClaimController', () => {
   });
 
   describe('submitClaim', () => {
-    it('should be called', () => {
+    it('should return correct DTO', () => {
       expect(
         claimController.submitClaim({
           policyId: '',
