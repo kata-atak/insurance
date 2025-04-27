@@ -10,6 +10,7 @@ export enum IncidentType {
 export enum ReasonCode {
   APPROVED = 'APPROVED',
   POLICY_INACTIVE = 'POLICY_INACTIVE',
+  POLICY_NOT_FOUND = 'POLICY_NOT_FOUND',
   NOT_COVERED = 'NOT_COVERED',
   ZERO_PAYOUT = 'ZERO_PAYOUT',
 }
