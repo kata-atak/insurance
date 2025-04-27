@@ -20,10 +20,10 @@ describe('ClaimController', () => {
     it('should return correct DTO', () => {
       expect(
         claimController.submitClaim({
-          policyId: '',
+          policyId: 'POL456',
           incidentType: IncidentType.ACCIDENT,
-          incidentDate: '',
-          amountClaimed: 0,
+          incidentDate: '2025-04-27',
+          amountClaimed: 250,
         }),
       ).toBeInstanceOf(ClaimSubmissionResponseDto);
     });

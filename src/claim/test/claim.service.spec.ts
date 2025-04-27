@@ -19,10 +19,10 @@ describe('ClaimService', () => {
     it('should return correct DTO', () => {
       expect(
         claimService.submitClaim({
-          policyId: '',
+          policyId: 'POL456',
           incidentType: IncidentType.ACCIDENT,
-          incidentDate: new Date(),
-          amountClaimed: 0,
+          incidentDate: new Date('2025-04-27'),
+          amountClaimed: 250,
         }),
       ).toBeInstanceOf(ClaimSubmissionResponseDto);
     });
@@ -31,7 +31,7 @@ describe('ClaimService', () => {
       const response = claimService.submitClaim({
         policyId: 'POL789',
         incidentType: IncidentType.ACCIDENT,
-        incidentDate: new Date(),
+        incidentDate: new Date('2025-04-27'),
         amountClaimed: 0,
       });
       expect(response.payout).toEqual(0);
@@ -41,9 +41,9 @@ describe('ClaimService', () => {
 
     it('should respond appropriately when a policy is not active', () => {
       const response = claimService.submitClaim({
-        policyId: 'POL789',
+        policyId: 'POL123',
         incidentType: IncidentType.ACCIDENT,
-        incidentDate: new Date(),
+        incidentDate: new Date('2025-04-27'),
         amountClaimed: 0,
       });
       expect(response.payout).toEqual(0);
@@ -53,14 +53,50 @@ describe('ClaimService', () => {
 
     it('should respond appropriately when a claimed incident is not covered', () => {
       const response = claimService.submitClaim({
-        policyId: 'POL789',
-        incidentType: IncidentType.ACCIDENT,
-        incidentDate: new Date(),
+        policyId: 'POL456',
+        incidentType: IncidentType.THEFT,
+        incidentDate: new Date('2025-04-27'),
         amountClaimed: 0,
       });
       expect(response.payout).toEqual(0);
       expect(response.approved).toEqual(false);
       expect(response.reasonCode).toEqual(ReasonCode.NOT_COVERED);
+    });
+
+    it('should respond appropriately when a policy is evaluated to be a negative (zero) payout', () => {
+      const response = claimService.submitClaim({
+        policyId: 'POL456',
+        incidentType: IncidentType.ACCIDENT,
+        incidentDate: new Date('2025-04-27'),
+        amountClaimed: 150,
+      });
+      expect(response.payout).toEqual(0);
+      expect(response.approved).toEqual(false);
+      expect(response.reasonCode).toEqual(ReasonCode.ZERO_PAYOUT);
+    });
+
+    it('should respond appropriately when a policy is evaluated to be a zero payout', () => {
+      const response = claimService.submitClaim({
+        policyId: 'POL456',
+        incidentType: IncidentType.ACCIDENT,
+        incidentDate: new Date('2025-04-27'),
+        amountClaimed: 250,
+      });
+      expect(response.payout).toEqual(0);
+      expect(response.approved).toEqual(false);
+      expect(response.reasonCode).toEqual(ReasonCode.ZERO_PAYOUT);
+    });
+
+    it('should respond appropriately when a policy is evaluated to be approved', () => {
+      const response = claimService.submitClaim({
+        policyId: 'POL456',
+        incidentType: IncidentType.ACCIDENT,
+        incidentDate: new Date('2025-04-27'),
+        amountClaimed: 251,
+      });
+      expect(response.payout).toEqual(1);
+      expect(response.approved).toEqual(true);
+      expect(response.reasonCode).toEqual(ReasonCode.APPROVED);
     });
   });
 
@@ -72,6 +108,28 @@ describe('ClaimService', () => {
       const policyId = 'POL456';
       const foundPolicy = claimService.findPolicy(policyId);
       expect(foundPolicy?.policyId).toBe(policyId);
+    });
+  });
+
+  describe('evaluateIncidentDate', () => {
+    it('should return true if policy was active on incident date', () => {
+      expect(
+        claimService.evaluateIncidentDate(
+          new Date('2025-04-27'),
+          existingPolicies[1].startDate,
+          existingPolicies[1].endDate,
+        ),
+      ).toBe(true);
+    });
+
+    it('should return false if policy was not active on incident date', () => {
+      expect(
+        claimService.evaluateIncidentDate(
+          new Date('2025-04-27'),
+          existingPolicies[0].startDate,
+          existingPolicies[0].endDate,
+        ),
+      ).toBe(false);
     });
   });
 
@@ -95,35 +153,17 @@ describe('ClaimService', () => {
     });
   });
 
-  describe('evaluateIncidentDate', () => {
-    it('should return true if policy was active on incident date', () => {
-      expect(
-        claimService.evaluateIncidentDate(
-          new Date('2025-04-27'),
-          existingPolicies[1].startDate,
-          existingPolicies[1].endDate,
-        ),
-      ).toBe(true);
-    });
-
-    it('should return false if policy was not active on incident date', () => {
-      expect(
-        claimService.evaluateIncidentDate(
-          new Date('2025-04-27'),
-          existingPolicies[0].startDate,
-          existingPolicies[0].endDate,
-        ),
-      ).toBe(true);
-    });
-  });
-
   describe('evaluateAmountClaimed', () => {
     it('should return { ZERO_PAYOUT, 0 } if payout is negative', () => {
-      const zeroPayout = { reasonCode: ReasonCode.ZERO_PAYOUT, payout: 0 };
+      const zeroPayout = {
+        approved: false,
+        payout: 0,
+        reasonCode: ReasonCode.ZERO_PAYOUT,
+      };
 
       expect(
         claimService.evaluateAmountClaimed(
-          0,
+          150,
           existingPolicies[1].deductible,
           existingPolicies[1].coverageLimit,
         ),
@@ -131,11 +171,15 @@ describe('ClaimService', () => {
     });
 
     it('should return { ZERO_PAYOUT, 0 } if payout is 0', () => {
-      const zeroPayout = { reasonCode: ReasonCode.ZERO_PAYOUT, payout: 0 };
+      const zeroPayout = {
+        approved: false,
+        payout: 0,
+        reasonCode: ReasonCode.ZERO_PAYOUT,
+      };
 
       expect(
         claimService.evaluateAmountClaimed(
-          0,
+          250,
           existingPolicies[1].deductible,
           existingPolicies[1].coverageLimit,
         ),
@@ -143,15 +187,35 @@ describe('ClaimService', () => {
     });
 
     it('should return APPROVED if payout is non-negative and non-zero', () => {
-      const zeroPayout = { reasonCode: ReasonCode.ZERO_PAYOUT, payout: 0 };
+      const approvedPayout = {
+        approved: true,
+        payout: 24750,
+        reasonCode: ReasonCode.APPROVED,
+      };
 
       expect(
         claimService.evaluateAmountClaimed(
-          0,
+          25000,
           existingPolicies[1].deductible,
           existingPolicies[1].coverageLimit,
         ),
-      ).toEqual(zeroPayout);
+      ).toEqual(approvedPayout);
+    });
+
+    it('should return APPROVED and payout should be coverage limit if payout is greater than coverage limit', () => {
+      const maxPayout = {
+        approved: true,
+        payout: existingPolicies[1].coverageLimit,
+        reasonCode: ReasonCode.APPROVED,
+      };
+
+      expect(
+        claimService.evaluateAmountClaimed(
+          65000,
+          existingPolicies[1].deductible,
+          existingPolicies[1].coverageLimit,
+        ),
+      ).toEqual(maxPayout);
     });
   });
 });
